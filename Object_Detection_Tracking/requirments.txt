@@ -1,5 +1,4 @@
-flask
+Flask
 opencv-python
 ultralytics
-numpy
-supervision
+gunicorn

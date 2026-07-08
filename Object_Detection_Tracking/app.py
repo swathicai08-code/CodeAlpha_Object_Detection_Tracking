@@ -1,76 +1,54 @@
-from flask import Flask, render_template, Response
-import cv2
+from flask import Flask, render_template, request
 from ultralytics import YOLO
+import cv2
+import os
 
 app = Flask(__name__)
 
-# Load YOLOv8 model
+UPLOAD_FOLDER = "uploads"
+RESULT_FOLDER = "static/results"
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(RESULT_FOLDER, exist_ok=True)
+
 model = YOLO("yolov8n.pt")
 
-# Webcam
-cap = cv2.VideoCapture(0)
-
-object_id = 0
-
-def generate_frames():
-    global object_id
-
-    while True:
-        success, frame = cap.read()
-
-        if not success:
-            break
-
-        results = model(frame)
-
-        for result in results:
-            boxes = result.boxes
-
-            for box in boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-
-                conf = float(box.conf[0])
-                cls = int(box.cls[0])
-
-                label = model.names[cls]
-
-                object_id += 1
-
-                cv2.rectangle(
-                    frame,
-                    (x1, y1),
-                    (x2, y2),
-                    (0, 255, 0),
-                    2
-                )
-
-                cv2.putText(
-                    frame,
-                    f"{label} ID:{object_id}",
-                    (x1, y1-10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (255,255,255),
-                    2
-                )
-
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' +
-               frame + b'\r\n')
-
-@app.route('/')
+@app.route("/")
 def home():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/video')
-def video():
-    return Response(
-        generate_frames(),
-        mimetype='multipart/x-mixed-replace; boundary=frame'
+@app.route("/detect", methods=["POST"])
+def detect():
+
+    file = request.files["image"]
+
+    input_path = os.path.join(
+        UPLOAD_FOLDER,
+        file.filename
     )
 
+    file.save(input_path)
+
+    image = cv2.imread(input_path)
+
+    results = model(image)
+
+    annotated = results[0].plot()
+
+    output_path = os.path.join(
+        RESULT_FOLDER,
+        file.filename
+    )
+
+    cv2.imwrite(output_path, annotated)
+
+    return render_template(
+        "index.html",
+        result_image=output_path
+    )
+
+import os
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
