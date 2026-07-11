@@ -5,22 +5,30 @@ import os
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "uploads"
-RESULT_FOLDER = "static/results"
+UPLOAD_FOLDER = os.path.join(app.root_path, "uploads")
+RESULT_FOLDER = os.path.join(app.root_path, "static", "results")
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 model = YOLO("yolov8n.pt")
 
+
 @app.route("/")
 def home():
     return render_template("index.html")
+
 
 @app.route("/detect", methods=["POST"])
 def detect():
 
     file = request.files["image"]
+
+    if file.filename == "":
+        return render_template(
+            "index.html",
+            error="Please select an image."
+        )
 
     input_path = os.path.join(
         UPLOAD_FOLDER,
@@ -44,11 +52,10 @@ def detect():
 
     return render_template(
         "index.html",
-        result_image=output_path
+        result_image=file.filename
     )
 
-import os
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=True)
