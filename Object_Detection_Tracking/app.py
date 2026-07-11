@@ -39,7 +39,11 @@ def detect():
 
     image = cv2.imread(input_path)
 
-    results = model(image)
+    results = model.predict(
+    source=image,
+    imgsz=640,
+    conf=0.30,
+    verbose=False    )
 
     annotated = results[0].plot()
 
